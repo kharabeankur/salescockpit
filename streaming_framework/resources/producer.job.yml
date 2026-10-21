@@ -1,0 +1,20 @@
+# POC only — manually triggered job that produces fake Avro data to Kafka.
+resources:
+  jobs:
+    produce_fake_data_job:
+      name: streaming_framework_produce_fake_data
+      parameters:
+        - name: topic
+          default: life_policy_overview_sync_
+        - name: num_records
+          default: "100"
+        - name: secret_scope
+          default: ${var.secret_scope}
+        - name: kafka_bootstrap_servers
+          default: ${var.kafka_bootstrap_servers}
+        - name: schema_registry_url
+          default: ${var.schema_registry_url}
+      tasks:
+        - task_key: produce
+          notebook_task:
+            notebook_path: ../notebooks/produce_fake_data.py

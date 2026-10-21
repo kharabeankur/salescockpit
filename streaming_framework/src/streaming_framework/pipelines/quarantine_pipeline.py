@@ -38,7 +38,7 @@ from pyspark.sql.types import (
     StringType, IntegerType, LongType,
     BooleanType, TimestampType, BinaryType
 )
-from pipelines.base_pipeline import BasePipeline
+from streaming_framework.pipelines.base_pipeline import BasePipeline
 
 
 class QuarantinePipeline(BasePipeline):

@@ -1,0 +1,216 @@
+# KDP — life_policy_overview_sync_  (one topic = Job A + Job B)
+#
+#   Job A  kdp_life_policy_landing_job     setup → landing (Kafka → ADLS files) → trigger Job B
+#   Job B  kdp_life_policy_autoloader_job  autoloader ∥ quarantine → monitor
+#
+# To add a topic in stage 1: copy this file, rename the two resource keys and
+# change the topic defaults in `parameters`. (Stage 2 replaces this with metadata.)
+
+resources:
+  jobs:
+
+    # ════════════════════════════════════════════════════════════
+    # Job A — Kafka → Landing files
+    # ════════════════════════════════════════════════════════════
+    kdp_life_policy_landing_job:
+      name: kdp_life_policy_landing
+      max_concurrent_runs: 1         # one writer per checkpoint
+      schedule:
+        quartz_cron_expression: ${var.schedule_cron}
+        timezone_id: UTC
+        pause_status: ${var.schedule_pause_status}
+      email_notifications:
+        on_failure:
+          - ${workspace.current_user.userName}
+
+      parameters:
+        # topic
+        - name: source_system
+          default: KDP
+        - name: topic
+          default: life_policy_overview_sync_
+        - name: schema_subject
+          default: life_policy_overview_sync_-value
+        - name: key_columns
+          default: application_id:int,policy_number:long
+        - name: encoding
+          default: avro
+        - name: starting_offset
+          default: latest
+        - name: trigger_interval
+          default: availableNow
+        # environment
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: landing_volume
+          default: ${var.landing_volume}
+        - name: secret_scope
+          default: ${var.secret_scope}
+        - name: kafka_bootstrap_servers
+          default: ${var.kafka_bootstrap_servers}
+        - name: schema_registry_url
+          default: ${var.schema_registry_url}
+        - name: apply_ddl
+          default: ${var.apply_ddl}
+
+      tasks:
+        - task_key: setup
+          environment_key: default
+          python_wheel_task:
+            package_name: streaming_framework
+            entry_point: setup_tables
+            parameters:
+              - --catalog={{job.parameters.catalog}}
+              - --schema={{job.parameters.schema}}
+              - --landing-volume={{job.parameters.landing_volume}}
+              - --apply-ddl={{job.parameters.apply_ddl}}
+
+        - task_key: landing
+          depends_on:
+            - task_key: setup
+          environment_key: default
+          python_wheel_task:
+            package_name: streaming_framework
+            entry_point: run_pipelines
+            parameters:
+              - --job-type=landing
+              - --source-system={{job.parameters.source_system}}
+              - --topic={{job.parameters.topic}}
+              - --schema-subject={{job.parameters.schema_subject}}
+              - --key-columns={{job.parameters.key_columns}}
+              - --encoding={{job.parameters.encoding}}
+              - --starting-offset={{job.parameters.starting_offset}}
+              - --trigger-interval={{job.parameters.trigger_interval}}
+              - --catalog={{job.parameters.catalog}}
+              - --schema={{job.parameters.schema}}
+              - --landing-volume={{job.parameters.landing_volume}}
+              - --secret-scope={{job.parameters.secret_scope}}
+              - --kafka-bootstrap-servers={{job.parameters.kafka_bootstrap_servers}}
+              - --schema-registry-url={{job.parameters.schema_registry_url}}
+
+        # Runs Job B only after landing has finished writing files.
+        # Alternative: remove this task and give Job B a file-arrival trigger
+        # on the landing volume path instead.
+        - task_key: trigger_autoloader
+          depends_on:
+            - task_key: landing
+          run_job_task:
+            job_id: ${resources.jobs.kdp_life_policy_autoloader_job.id}
+            job_parameters:
+              source_system: "{{job.parameters.source_system}}"
+              topic: "{{job.parameters.topic}}"
+              schema_subject: "{{job.parameters.schema_subject}}"
+              key_columns: "{{job.parameters.key_columns}}"
+              encoding: "{{job.parameters.encoding}}"
+              trigger_interval: "{{job.parameters.trigger_interval}}"
+              catalog: "{{job.parameters.catalog}}"
+              schema: "{{job.parameters.schema}}"
+              landing_volume: "{{job.parameters.landing_volume}}"
+              secret_scope: "{{job.parameters.secret_scope}}"
+              schema_registry_url: "{{job.parameters.schema_registry_url}}"
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "2"
+            dependencies:
+              - ../dist/*.whl
+
+    # ════════════════════════════════════════════════════════════
+    # Job B — Landing files → Bronze (Auto Loader) + Quarantine
+    # ════════════════════════════════════════════════════════════
+    kdp_life_policy_autoloader_job:
+      name: kdp_life_policy_autoloader
+      max_concurrent_runs: 1
+      email_notifications:
+        on_failure:
+          - ${workspace.current_user.userName}
+
+      parameters:
+        - name: source_system
+          default: KDP
+        - name: topic
+          default: life_policy_overview_sync_
+        - name: schema_subject
+          default: life_policy_overview_sync_-value
+        - name: key_columns
+          default: application_id:int,policy_number:long
+        - name: encoding
+          default: avro
+        - name: trigger_interval
+          default: availableNow
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: landing_volume
+          default: ${var.landing_volume}
+        - name: secret_scope
+          default: ${var.secret_scope}
+        - name: schema_registry_url
+          default: ${var.schema_registry_url}
+
+      tasks:
+        - task_key: autoloader
+          environment_key: default
+          python_wheel_task:
+            package_name: streaming_framework
+            entry_point: run_pipelines
+            parameters:
+              - --job-type=autoloader
+              - --layer=autoloader
+              - --source-system={{job.parameters.source_system}}
+              - --topic={{job.parameters.topic}}
+              - --schema-subject={{job.parameters.schema_subject}}
+              - --key-columns={{job.parameters.key_columns}}
+              - --encoding={{job.parameters.encoding}}
+              - --trigger-interval={{job.parameters.trigger_interval}}
+              - --catalog={{job.parameters.catalog}}
+              - --schema={{job.parameters.schema}}
+              - --landing-volume={{job.parameters.landing_volume}}
+              - --secret-scope={{job.parameters.secret_scope}}
+              - --schema-registry-url={{job.parameters.schema_registry_url}}
+
+        - task_key: quarantine
+          environment_key: default
+          python_wheel_task:
+            package_name: streaming_framework
+            entry_point: run_pipelines
+            parameters:
+              - --job-type=autoloader
+              - --layer=quarantine
+              - --source-system={{job.parameters.source_system}}
+              - --topic={{job.parameters.topic}}
+              - --schema-subject={{job.parameters.schema_subject}}
+              - --key-columns={{job.parameters.key_columns}}
+              - --encoding={{job.parameters.encoding}}
+              - --trigger-interval={{job.parameters.trigger_interval}}
+              - --catalog={{job.parameters.catalog}}
+              - --schema={{job.parameters.schema}}
+              - --landing-volume={{job.parameters.landing_volume}}
+              - --secret-scope={{job.parameters.secret_scope}}
+              - --schema-registry-url={{job.parameters.schema_registry_url}}
+
+        - task_key: monitor
+          depends_on:
+            - task_key: autoloader
+            - task_key: quarantine
+          run_if: ALL_DONE           # report even when a layer failed
+          environment_key: default
+          python_wheel_task:
+            package_name: streaming_framework
+            entry_point: monitor
+            parameters:
+              - --catalog={{job.parameters.catalog}}
+              - --schema={{job.parameters.schema}}
+
+      # Serverless compute. For classic compute: replace environment_key with
+      # job_cluster_key, add `libraries: [{whl: ../dist/*.whl}]` and a job_clusters block.
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "2"
+            dependencies:
+              - ../dist/*.whl

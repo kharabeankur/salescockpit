@@ -1,0 +1,76 @@
+# Databricks Asset Bundle — Streaming Framework
+# Confluent Kafka → ADLS landing files → Auto Loader → Bronze Delta
+#
+#   databricks bundle validate
+#   databricks bundle deploy -t dev
+#   databricks bundle run    -t dev kdp_life_policy_landing_job     # Job A (triggers Job B)
+#   databricks bundle deploy -t prod
+#
+# Docs: https://docs.databricks.com/dev-tools/bundles/
+
+bundle:
+  name: streaming_framework
+
+include:
+  - resources/*.yml
+
+artifacts:
+  python_artifact:
+    type: whl
+    path: .
+    build: uv build --wheel
+    dynamic_version: true      # unique wheel version per deploy → no stale env cache
+
+variables:
+  catalog:
+    description: Unity Catalog catalog (must already exist).
+    default: abd_easywithdata_poc
+  schema:
+    description: Schema for bronze / quarantine / audit tables and volumes. Created if missing.
+    default: streaming_poc
+  landing_volume:
+    description: Volume holding the raw landing files (/Volumes/<catalog>/<schema>/<landing_volume>).
+    default: Landing
+  secret_scope:
+    description: Secret scope with kafka-api-key, kafka-api-secret, sr-api-key, sr-api-secret (+ optional smtp-password).
+    default: streaming_framework
+  kafka_bootstrap_servers:
+    description: Confluent Kafka bootstrap servers.
+    default: pkc-619z3.us-east1.gcp.confluent.cloud:9092
+  schema_registry_url:
+    description: Confluent Schema Registry URL.
+    default: https://psrc-176j5l8.us-east1.gcp.confluent.cloud
+  apply_ddl:
+    description: "true = run ddl/create_tables_kdp.sql in the setup task (see README before enabling)."
+    default: "false"
+  schedule_cron:
+    description: Quartz cron for the landing jobs (Job A).
+    default: "0 0/15 * * * ?"     # every 15 minutes
+  schedule_pause_status:
+    description: PAUSED or UNPAUSED. Development mode always pauses schedules.
+    default: PAUSED
+
+targets:
+  dev:
+    # Development mode: "[dev <user>]" prefix, schedules paused, per-user deployment.
+    mode: development
+    default: true
+    # workspace:
+    #   host: https://<your-workspace>.azuredatabricks.net
+    variables:
+      schema: streaming_poc_dev      # isolated tables, landing files and checkpoints
+
+  prod:
+    mode: production
+    workspace:
+      # host: https://<your-workspace>.azuredatabricks.net
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      schema: streaming_poc          # existing tables, landing files and checkpoints are reused
+      schedule_pause_status: UNPAUSED
+    permissions:
+      - user_name: ${workspace.current_user.userName}
+        level: CAN_MANAGE
+    # Recommended for real production: run as a service principal
+    # run_as:
+    #   service_principal_name: <application-id>

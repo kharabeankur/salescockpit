@@ -210,10 +210,20 @@ class PipelineMonitor:
             ORDER BY created_at DESC
         """)
 
-    def run_all(self):
-        """Run every monitoring check."""
+    def run_all(self, render=None):
+        """
+        Run every monitoring check.
+
+        render: optional callable(df). Defaults to df.display() (notebooks).
+                The bundle's monitor task passes df.show() because
+                display() only exists inside notebooks.
+        """
         def _display(df):
-            if df is not None:
+            if df is None:
+                return
+            if render is not None:
+                render(df)
+            else:
                 df.display()
 
         _display(self.audit_summary())

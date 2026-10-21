@@ -1,14 +1,15 @@
+# Databricks notebook source
 # ============================================================
-# test_pipeline.py — Pipeline Data Quality Test Suite
-# Copy each cell into a Databricks notebook and run.
+# framework_tests.py — Pipeline Data Quality Test Suite
+# Deployed by the bundle; set the catalog/schema widgets and Run all.
 # ============================================================
 
 # ── CELL 1: Test Setup ────────────────────────────────────────
-import sys
-sys.path.insert(0, "/tmp/streaming_framework_final")
+dbutils.widgets.text("catalog", "abd_easywithdata_poc")
+dbutils.widgets.text("schema", "streaming_poc_dev")
 
-CATALOG   = "abd_easywithdata_poc"
-SCHEMA    = "streaming_poc"
+CATALOG   = dbutils.widgets.get("catalog")
+SCHEMA    = dbutils.widgets.get("schema")
 DB        = f"{CATALOG}.{SCHEMA}"
 
 LANDING_TABLE    = f"{DB}.landing_life_policy"
@@ -35,6 +36,8 @@ def section(title):
 print("✅ Test setup ready")
 print(f"   Catalog : {CATALOG}")
 print(f"   Schema  : {SCHEMA}")
+
+# COMMAND ----------
 
 # ── CELL 2: Landing Table Tests ───────────────────────────────
 section("LANDING TABLE TESTS")
@@ -97,6 +100,8 @@ if landing_exists:
          f"{wrong_topic} rows with wrong topic")
 
     print(f"\n  Landing row count : {landing_count}")
+
+# COMMAND ----------
 
 # ── CELL 3: Bronze Table Tests ────────────────────────────────
 section("BRONZE TABLE TESTS")
@@ -232,6 +237,8 @@ if bronze_exists:
     print(f"  Valid messages    : {bronze_count - invalid}")
     print(f"  Invalid messages  : {invalid}")
 
+# COMMAND ----------
+
 # ── CELL 4: Data Consistency Tests ───────────────────────────
 section("DATA CONSISTENCY TESTS")
 
@@ -271,6 +278,8 @@ if landing_exists and bronze_exists:
     test("Bronze policy_number values are positive",
          bad_policy == 0,
          f"{bad_policy} invalid policy numbers")
+
+# COMMAND ----------
 
 # ── CELL 5: Audit Log Tests ───────────────────────────────────
 section("AUDIT LOG TESTS")
@@ -317,6 +326,8 @@ if audit_exists:
          slow_runs == 0,
          f"{slow_runs} slow runs > 300s")
 
+# COMMAND ----------
+
 # ── CELL 6: Quarantine Tests ──────────────────────────────────
 section("QUARANTINE TABLE TESTS")
 
@@ -338,6 +349,8 @@ if quarantine_exists:
          q_count == 0,
          f"{q_count} undeserializable messages found")
 
+# COMMAND ----------
+
 # ── CELL 7: Final Summary ─────────────────────────────────────
 section("TEST SUMMARY")
 
@@ -355,6 +368,8 @@ if failed:
         print(f"    ❌ {f}")
 else:
     print(f"\n  🎉 ALL TESTS PASSED — Pipeline data quality verified!")
+
+# COMMAND ----------
 
 # ── CELL 8: Sample Data Preview ──────────────────────────────
 section("SAMPLE BRONZE DATA")
@@ -383,6 +398,8 @@ spark.sql(f"""
     ORDER BY __kafka_timestamp DESC
     LIMIT 10
 """).display()
+
+# COMMAND ----------
 
 # ── CELL 9: Detailed Stats ────────────────────────────────────
 section("DETAILED STATISTICS")

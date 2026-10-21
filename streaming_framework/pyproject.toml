@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "streaming_framework"
+version = "0.3.0"
+description = "Config-driven Confluent Kafka → Databricks Delta streaming framework"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # pyspark is provided by the Databricks runtime — do not pin it here
+    "confluent-kafka[avro,schemaregistry]>=2.6",
+    "fastavro>=1.9",
+]
+
+[project.optional-dependencies]
+producer = ["faker>=24"]
+dev = ["pytest>=8", "pyyaml>=6"]
+
+# Entry points used by python_wheel_task in resources/*.job.yml
+[project.scripts]
+setup_tables  = "streaming_framework.tasks.setup_tables:main"
+run_pipelines = "streaming_framework.tasks.run_pipelines:main"
+monitor       = "streaming_framework.tasks.monitor:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"streaming_framework.ddl" = ["*.sql"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

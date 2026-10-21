@@ -1,17 +1,17 @@
 -- ============================================================
 -- DDL: src_kdp bronze tables
--- Catalog : abd_easywithdata_poc
--- Schema  : streaming_poc  (POC)
---           src_kdp        (real project)
+-- Catalog : ${catalog}   (injected per bundle target)
+-- Schema  : ${schema}    (injected per bundle target)
 -- Source  : 11_Bronze_physical_model_databricks_v2.xlsx
 -- ============================================================
--- Run this ONCE before starting any pipeline.
+-- Executed by the `setup` task of the bundle job on every run
+-- (all statements are idempotent: CREATE ... IF NOT EXISTS).
 -- Tables are pre-created with exact typed schema.
 -- Pipelines write into these tables using mergeSchema=false.
 -- ============================================================
 
-USE CATALOG abd_easywithdata_poc;
-USE SCHEMA streaming_poc;
+USE CATALOG ${catalog};
+USE SCHEMA ${schema};
 
 -- ============================================================
 -- 1. life_policy_overview_sync_event  (42 columns, src_kdp)

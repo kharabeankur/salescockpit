@@ -39,7 +39,7 @@ from pyspark.sql.types import (
     ArrayType, DecimalType, TimestampType,
     DateType, BinaryType
 )
-from pipelines.base_pipeline import BasePipeline
+from streaming_framework.pipelines.base_pipeline import BasePipeline
 
 
 class BronzePipeline(BasePipeline):
@@ -232,7 +232,7 @@ class BronzePipeline(BasePipeline):
 
     # ── Avro transform — typed columns ─────────────────────────
     def _transform_avro(self, df: DataFrame) -> DataFrame:
-        from utils.schema_converter import SchemaConverter
+        from streaming_framework.utils.schema_converter import SchemaConverter
 
         print(f"[{self.pipeline_name}] Mode: Avro → typed columns (auto schema)")
 

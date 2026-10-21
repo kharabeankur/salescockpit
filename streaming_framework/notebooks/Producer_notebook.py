@@ -1,11 +1,20 @@
+# Databricks notebook source
 # ============================================================
 # Producer_notebook.py
-# Copy each cell into Databricks notebook named "Producer"
+# Standalone producer notebook (no framework import needed)
 # Run BEFORE the framework to generate fresh data
 # ============================================================
 
 # ── CELL 1: Install ───────────────────────────────────────────
-# %pip install authlib
+# COMMAND ----------
+
+# MAGIC %pip install faker "confluent-kafka[avro,schemaregistry]>=2.6" "fastavro>=1.9"
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
 
 # ── CELL 2: Config ───────────────────────────────────────────
 import json, random, time, os
@@ -18,18 +27,21 @@ from confluent_kafka.serialization import SerializationContext, MessageField
 
 fake = Faker()
 
+dbutils.widgets.text("secret_scope", "streaming_framework")
+SCOPE            = dbutils.widgets.get("secret_scope")
+
 KAFKA_BOOTSTRAP  = "pkc-619z3.us-east1.gcp.confluent.cloud:9092"
-# KAFKA_API_KEY    = os.environ.get("KAFKA_API_KEY")
-# KAFKA_API_SECRET = os.environ.get("KAFKA_API_SECRET")
-KAFKA_API_KEY    = "SYR5NDEIHCTTPZQU"
-KAFKA_API_SECRET = "cfltbIK0mdZ4BDHT8eKNQfv/tyuQWyLjGUeBfs8wkgH7iHc5gFcrC5hzIbzKvotA"
+KAFKA_API_KEY    = dbutils.secrets.get(SCOPE, "kafka-api-key")
+KAFKA_API_SECRET = dbutils.secrets.get(SCOPE, "kafka-api-secret")
 SR_URL           = "https://psrc-176j5l8.us-east1.gcp.confluent.cloud"
-SR_API_KEY       = os.environ.get("SR_API_KEY")
-SR_API_SECRET    = os.environ.get("SR_API_SECRET")
+SR_API_KEY       = dbutils.secrets.get(SCOPE, "sr-api-key")
+SR_API_SECRET    = dbutils.secrets.get(SCOPE, "sr-api-secret")
 TOPIC            = "life_policy_overview_sync_"
 
 print(f"KAFKA_API_KEY : {'✅' if KAFKA_API_KEY else '❌ MISSING'}")
 print(f"SR_API_KEY    : {'✅' if SR_API_KEY    else '❌ MISSING'}")
+
+# COMMAND ----------
 
 # ── CELL 3: Helpers ───────────────────────────────────────────
 def random_date_int(start_year=2010, end_year=2024):
@@ -46,6 +58,8 @@ def decimal_to_bytes(value: float, scale: int = 2) -> bytes:
 
 def random_domain_login():
     return f"cpas\\{fake.user_name()[:8]}"
+
+# COMMAND ----------
 
 # ── CELL 4: Record generator ──────────────────────────────────
 def generate_life_policy_record():
@@ -150,6 +164,8 @@ def generate_life_policy_record():
     return {"auditInformation": audit_info, "lifePolicy": life_policy}
 
 print("✅ Generator ready!")
+
+# COMMAND ----------
 
 # ── CELL 5: Produce ───────────────────────────────────────────
 sr_client = SchemaRegistryClient({

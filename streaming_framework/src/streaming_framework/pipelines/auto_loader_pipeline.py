@@ -24,7 +24,7 @@ to BronzePipeline — inherited with zero code duplication.
 """
 
 from pyspark.sql import DataFrame
-from pipelines.bronze_pipeline import BronzePipeline
+from streaming_framework.pipelines.bronze_pipeline import BronzePipeline
 
 
 class AutoLoaderPipeline(BronzePipeline):

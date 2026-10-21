@@ -6,7 +6,7 @@
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC ![POC Demo Architecture](/Workspace/Users/lanister20@gmail.com/streaming_framework/Doc/poc_demo_architecture.png)
+# MAGIC ![POC Demo Architecture](../docs/poc_demo_architecture.png)
 # MAGIC
 # MAGIC ## 1. Business case
 # MAGIC

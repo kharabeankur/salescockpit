@@ -20,7 +20,7 @@ from pyspark.sql.functions import (
     col, current_timestamp,
     year, month, dayofmonth, hour
 )
-from pipelines.base_pipeline import BasePipeline
+from streaming_framework.pipelines.base_pipeline import BasePipeline
 
 
 class LandingPipeline(BasePipeline):
@@ -87,7 +87,7 @@ class LandingPipeline(BasePipeline):
             else {"processingTime": trigger}
         )
 
-        return (
+        query = (
             df.writeStream
             .format(file_format)
             .outputMode("append")
@@ -97,3 +97,8 @@ class LandingPipeline(BasePipeline):
             .trigger(**trigger_opts)
             .start()
         )
+        # Block until the availableNow batch is done (same as BasePipeline).
+        # Without this, run() logs SUCCESS immediately and a job task can exit
+        # — and Job B can start — while files are still being written.
+        query.awaitTermination()
+        return query
